@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_flutter/adapters/user_adapter.dart';
+import 'package:sqflite_flutter/models/user.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -33,7 +36,7 @@ class _RegisterPageState extends State<RegisterPage> {
     final date = await showDatePicker(
       context: context,
       initialDate: DateTime(2000),
-      firstDate: DateTime(1900),
+      firstDate: DateTime(1980),
       lastDate: DateTime.now(),
     );
     if (!mounted || date == null) return;
@@ -41,6 +44,32 @@ class _RegisterPageState extends State<RegisterPage> {
     _birthdateController.text =
         '${date.year}-${date.month.toString().padLeft(2, '0')}-'
         '${date.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _registerUser(User user) async {
+    try {
+      final insertedId = await UserAdapter.instance.insertUser(user);
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            insertedId <= 0
+                ? 'Email sudah terdaftar'
+                : 'Data berhasil disimpan ke database.',
+          ),
+        ),
+      );
+    } on DatabaseException catch (error, stackTrace) {
+      debugPrint('Gagal menyimpan data register: $error\n$stackTrace');
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal menyimpan data. Silakan coba kembali.'),
+        ),
+      );
+    }
   }
 
   @override
@@ -57,6 +86,29 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
           textAlign: TextAlign.center,
         ),
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 20),
+            child: IconButton(
+              tooltip: 'Pengaturan',
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                showDialog<void>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Pengaturan'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Tutup'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -291,12 +343,27 @@ class _RegisterPageState extends State<RegisterPage> {
                 width: double.infinity,
                 height: 50,
                 child: FilledButton(
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      // Handle registration logic here
-                    } else {}
-                  },
+                  onPressed: () async {
+                    if (!_formKey.currentState!.validate()) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Periksa kembali inputan Anda'),
+                        ),
+                      );
+                      return;
+                    }
 
+                    final user = User(
+                      user_fullname: _fullNameController.text.trim(),
+                      user_email: _emailController.text.trim(),
+                      user_password: _passwordController.text,
+                      user_birthdate: _birthdateController.text,
+                      user_gender: _selectedGender!,
+                      user_address: _addressController.text.trim(),
+                      user_phone: _phoneController.text.trim(),
+                    );
+                    await _registerUser(user);
+                  },
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.deepOrange,
                     foregroundColor: Colors.white,

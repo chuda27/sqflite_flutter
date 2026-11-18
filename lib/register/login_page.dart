@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_flutter/adapters/user_adapter.dart';
+import 'package:sqflite_flutter/screens/main_navigation_page.dart';
 import 'package:sqflite_flutter/register/register_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -19,6 +22,43 @@ class _LoginPageState extends State<LoginPage> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Masukkan email dan password')),
+      );
+      return;
+    }
+
+    try {
+      final user = await UserAdapter.instance.authenticateUser(
+        email: email,
+        password: password,
+      );
+      if (!mounted) return;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Email atau password tidak valid')),
+        );
+        return;
+      }
+
+      await Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute<void>(
+          builder: (context) => MainNavigationPage(currentUser: user),
+        ),
+      );
+    } on DatabaseException catch (error, stackTrace) {
+      debugPrint('Gagal login: $error\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal memeriksa akun. Coba kembali.')),
+      );
+    }
   }
 
   @override
@@ -119,7 +159,7 @@ class _LoginPageState extends State<LoginPage> {
               width: double.infinity,
               height: 50,
               child: FilledButton(
-                onPressed: () {},
+                onPressed: _login,
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.deepOrange,
                   foregroundColor: Colors.white,
